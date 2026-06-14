@@ -1,5 +1,7 @@
 /* Standalone cache-node binary for the harness / pre-prod functional bring-up.
- * Usage: dfkv_server --dir <path> --port <p|0> --cap <bytes>
+ * Usage: dfkv_server --dir <p1[,p2,p3...]> --port <p|0> --cap <bytes>
+ *   --dir accepts comma-separated NVMe SSD paths (like dingo-cache --cache_dir);
+ *   --cap is the TOTAL capacity, split evenly across the disks.
  * Prints "PORT <port>" on stdout once listening, then runs until SIGTERM/SIGINT. */
 #include <csignal>
 #include <cstdio>
@@ -27,7 +29,16 @@ int main(int argc, char** argv) {
   std::signal(SIGINT, OnSig);
   std::signal(SIGTERM, OnSig);
 
-  KvNodeServer srv(dir, cap);
+  // split --dir on commas into one entry per NVMe SSD
+  std::vector<std::string> dirs;
+  for (size_t i = 0, j; i <= dir.size(); i = j + 1) {
+    j = dir.find(',', i);
+    if (j == std::string::npos) j = dir.size();
+    if (j > i) dirs.push_back(dir.substr(i, j - i));
+  }
+  if (dirs.empty()) dirs.push_back(dir);
+
+  KvNodeServer srv(dirs, cap);
   if (srv.Start(port) != Status::kOk) {
     std::fprintf(stderr, "failed to start on port %d\n", port);
     return 1;

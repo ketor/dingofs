@@ -10,7 +10,11 @@ namespace cache {
 namespace kv {
 
 KvNodeServer::KvNodeServer(const std::string& cache_dir, uint64_t capacity_bytes)
-    : store_(KVStore::Options{cache_dir, capacity_bytes}) {}
+    : group_(DiskCacheGroup::Options{{cache_dir}, capacity_bytes}) {}
+
+KvNodeServer::KvNodeServer(const std::vector<std::string>& cache_dirs,
+                           uint64_t capacity_bytes)
+    : group_(DiskCacheGroup::Options{cache_dirs, capacity_bytes}) {}
 
 KvNodeServer::~KvNodeServer() { Stop(); }
 
@@ -70,13 +74,13 @@ void KvNodeServer::Handle(int fd) {
   std::string data;
   switch (op) {
     case WireOp::kCache:
-      st = store_.Cache(key, payload.data(), payload_len);
+      st = group_.Cache(key, payload.data(), payload_len);
       break;
     case WireOp::kRange:
-      st = store_.Range(key, offset, length, &data);
+      st = group_.Range(key, offset, length, &data);
       break;
     case WireOp::kExist:
-      st = store_.IsCached(key) ? Status::kOk : Status::kNotFound;
+      st = group_.IsCached(key) ? Status::kOk : Status::kNotFound;
       break;
   }
 

@@ -12,8 +12,12 @@ DingoFS as its L3 external KV store (GLM-5.1 / MLA). Two layers:
      `BlockKey.size` is a fixed constant, so Put/Get/Exist build the identical
      identity key and route identically (payload length lives in the header).
    - `con_hash.{h,cc}` (+ `md5.h`) — Ketama ring (client-side routing).
-   - `kv_store.{h,cc}` — cache-node local store: disk + LRU + **cache-only / no
+   - `kv_store.{h,cc}` — single-disk local store: disk + LRU + **cache-only / no
      S3** (miss = clean NotFound); `Cache()` is synchronous & durable-visible.
+   - `disk_cache_group.{h,cc}` — **multi-NVMe per node** (like dingo-cache
+     `--cache_dir=d1,d2,d3`): one `KVStore` per disk, intra-node Ketama routes a
+     block to one disk, total capacity split across disks. `dfkv_server --dir`
+     accepts comma-separated paths.
    - `transport.h` + `tcp_transport.{h,cc}` — transport abstraction + a real TCP
      loopback impl used by the standalone harness.
    - `kv_node_server.{h,cc}` + `dfkv_server_main.cc` — a cache-node daemon
