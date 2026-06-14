@@ -32,10 +32,12 @@ Status RoundTrip(const std::string& node, WireOp op, const BlockKey& k,
   if (fd < 0) return Status::kIOError;
   struct Closer { int fd; ~Closer() { ::close(fd); } } closer{fd};
 
-  std::vector<char> req(kReqPrefix + payload_len);
-  EncodePrefix(req.data(), op, k, offset, length, payload_len);
-  if (payload_len) std::memcpy(req.data() + kReqPrefix, payload, payload_len);
-  if (!net::WriteAll(fd, req.data(), req.size())) return Status::kIOError;
+  // Send the fixed prefix then the payload (no combined buffer => no extra
+  // copy of the user payload; TCP_NODELAY keeps it to one segment for small ones).
+  char prefix[kReqPrefix];
+  EncodePrefix(prefix, op, k, offset, length, payload_len);
+  if (!net::WriteAll(fd, prefix, kReqPrefix)) return Status::kIOError;
+  if (payload_len && !net::WriteAll(fd, payload, payload_len)) return Status::kIOError;
 
   char rp[kRespPrefix];
   if (!net::ReadAll(fd, rp, kRespPrefix)) return Status::kIOError;
